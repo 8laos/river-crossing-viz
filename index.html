@@ -5,11 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>강 건너기 탐색 시각화</title>
 <style>
+@font-face {
+  font-family: 'KoPub World 돋움';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2102_ko@1.0/KoPubWorldDotumMedium.woff') format('woff');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'KoPub World 돋움';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2102_ko@1.0/KoPubWorldDotumBold.woff') format('woff');
+  font-weight: 700;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  background: #6b8a5a;
-  color: #e2e2e8;
-  font-family: 'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+  background: #6b8c63;
+  color: #f2f1df;
+  font-family: 'KoPub World 돋움', 'Malgun Gothic', sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -17,36 +27,36 @@ body {
   padding: 20px 16px;
   gap: 14px;
 }
-h1 { font-size: 1.15rem; color: #fff5d0; }
+h1 { font-size: 1.15rem; color: #f2f1df; }
 .subtitle { font-size: .75rem; color: #555; }
 .tabs { display: flex; gap: 8px; }
 .tab {
-  padding: 8px 22px; border: 2px solid #4a6438;
+  padding: 8px 22px; border: 2px solid #4d6646;
   border-radius: 8px; cursor: pointer;
   font-size: .88rem; font-family: inherit;
-  background: #507048; color: #777;
+  background: #567050; color: #777;
   transition: all .15s;
 }
-.tab.active { background: #e8609a; border-color: #e8609a; color: #fff; }
+.tab.active { background: #e8a0aa; border-color: #e8a0aa; color: #fff; }
 .main { display: flex; gap: 18px; align-items: flex-start; width: 100%; max-width: 1120px; }
 .left  { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 300px; }
 .right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 canvas { border-radius: 10px; display: block; }
-#river { border: 2px solid #4a6438; }
-#tree  { border: 2px solid #4a6438; background: #3d5830; }
-.panel { background: #507048; border: 1px solid #4a6438; border-radius: 10px; padding: 12px; }
+#river { border: 2px solid #4d6646; }
+#tree  { border: 2px solid #4d6646; background: #425740; }
+.panel { background: #567050; border: 1px solid #4d6646; border-radius: 10px; padding: 12px; }
 .speed-row { display:flex; align-items:center; gap:8px; font-size:.8rem; color:#888; margin-bottom:8px; }
-input[type=range] { flex:1; accent-color:#f272aa; }
+input[type=range] { flex:1; accent-color:#f0b0bc; }
 .btns { display:flex; gap:8px; }
 button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; font-size:.85rem; font-family:inherit; transition:background .15s; }
-#startBtn { background:#e8609a; color:#fff; }
-#startBtn:hover { background:#f272aa; }
-#startBtn:disabled { background:#4a6438; color:#555; cursor:default; }
-#resetBtn { background:#4a6438; color:#aaa; }
-#resetBtn:hover { background:#3d5830; }
+#startBtn { background:#e8a0aa; color:#fff; }
+#startBtn:hover { background:#f0b0bc; }
+#startBtn:disabled { background:#4d6646; color:#555; cursor:default; }
+#resetBtn { background:#4d6646; color:#aaa; }
+#resetBtn:hover { background:#425740; }
 .sbox {
   text-align:center; font-size:.82rem; padding:9px;
-  border-radius:7px; background:#507048; border:1px solid #4a6438;
+  border-radius:7px; background:#567050; border:1px solid #4d6646;
   color:#888; min-height:36px; display:flex; align-items:center; justify-content:center;
 }
 .sbox.ok { color:#4ade80; background:#0a2018; border-color:#1a5030; }
