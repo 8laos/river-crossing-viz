@@ -181,6 +181,7 @@ function buildDFS(){
 
       if(!isValid(mv.next)||visited.has(nk)){
         steps.push({t:'upd',id,status:'conflict'});
+        steps.push({t:'flash'});
         continue;
       }
 
@@ -230,6 +231,7 @@ function buildBFS(){
 
       if(!isValid(mv.next)||visited.has(nk)){
         steps.push({t:'upd',id,status:'conflict'});
+        steps.push({t:'flash'});
         continue;
       }
       steps.push({t:'upd',id,status:'safe'});
@@ -404,6 +406,7 @@ function drawTree(){
 
 // ── 애니메이션 ───────────────────────────────────────────────────
 let runId=0, visitCnt=0;
+let lastRiver={prev:[0,0,0,0],cur:[0,0,0,0],bx:BOAT_L}; // 강 마지막 상태 추적
 
 function getDelay(){
   const s=parseInt(document.getElementById('speed').value);
@@ -455,7 +458,6 @@ async function runAnim(){
         const fromX=step.prev[0]===0?BOAT_L:BOAT_R;
         const toX  =step.cur[0] ===0?BOAT_L:BOAT_R;
         if(step.moving!==null){
-          // 배가 강을 건너는 애니메이션
           const spd=parseInt(document.getElementById('speed').value);
           const frames=Math.max(6,22-spd*2);
           const fd=Math.max(15,40-spd*3);
@@ -468,6 +470,18 @@ async function runAnim(){
         } else {
           drawRiverAt(step.prev,step.cur,null,-1,toX);
         }
+        // 마지막 강 상태 저장
+        lastRiver={prev:step.prev,cur:step.cur,bx:toX};
+        break;
+      }
+      case 'flash':{
+        // 빨간 오버레이 짧게 표시
+        rCtx.fillStyle='rgba(248,80,80,0.45)';
+        rCtx.fillRect(0,0,RW,RH);
+        await sleep(180);
+        if(runId!==myId) return;
+        // 원래 강 상태 복원
+        drawRiverAt(lastRiver.prev,lastRiver.cur,null,-1,lastRiver.bx);
         break;
       }
       case 'solved':
