@@ -150,7 +150,7 @@ const COL={
   solution: '#60a5fa',   // 파랑 — 해 경로
 };
 
-// ── DFS 단계 생성 (자식 먼저 회색으로 펼친 뒤 평가) ───────────────
+// ── DFS 단계 생성 ────────────────────────────────────────────────
 function buildDFS(){
   nodeMap={}; edgeList=[]; steps=[];
   let uid=0;
@@ -168,25 +168,15 @@ function buildDFS(){
     }
     if(depth>14) return false;
 
-    const moves=getMoves(state);
-    const childIds=[];
-
-    // 1단계: 가능한 이동 모두 회색 노드로 먼저 표시
-    for(const mv of moves){
+    for(const mv of getMoves(state)){
       const id=uid++;
       const node={id,parentId,label:mv.label,emoji:mv.emoji,state:mv.next,level:depth+1,children:[]};
       nodeMap[id]=node;
       nodeMap[parentId].children.push(id);
       edgeList.push({from:parentId,to:id});
-      childIds.push({id,mv});
-      steps.push({t:'node',id,status:'pending'}); // 회색
-    }
 
-    // 2단계: 하나씩 평가
-    for(const {id,mv} of childIds){
       const nk=key(mv.next);
-
-      steps.push({t:'upd',id,status:'trying'});  // 노랑
+      steps.push({t:'node',id,status:'trying'});  // 바로 노랑으로 등장
       steps.push({t:'river',prev:state,cur:mv.next,moving:mv.label});
 
       if(!isValid(mv.next)||visited.has(nk)){
@@ -435,16 +425,12 @@ async function runAnim(){
       case 'node':{
         revealed.add(step.id);
         nodeState[step.id]=step.status;
-        if(step.status!=='pending') activeId=step.id;
+        activeId=step.id;
         const n=nodeMap[step.id];
-        if(step.status==='trying'||step.status==='pending'){
-          if(step.status==='trying'){
-            visitCnt++;
-            document.getElementById('vcnt').textContent=`방문: ${visitCnt}`;
-            setStatus(`「${n.label}」 이동 시도 중...`);
-          } else {
-            setStatus(`가능한 이동 펼치는 중... (${n.label})`);
-          }
+        if(step.status==='trying'){
+          visitCnt++;
+          document.getElementById('vcnt').textContent=`방문: ${visitCnt}`;
+          setStatus(`「${n.label}」 이동 시도 중...`);
         }
         break;
       }
