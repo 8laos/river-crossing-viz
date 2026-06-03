@@ -7,7 +7,7 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  background: #0d0d1a;
+  background: #1a1908;
   color: #e2e2e8;
   font-family: 'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
   min-height: 100vh;
@@ -17,14 +17,14 @@ body {
   padding: 20px 16px;
   gap: 14px;
 }
-h1 { font-size: 1.15rem; color: #9db5f5; }
+h1 { font-size: 1.15rem; color: #c8c46a; }
 .subtitle { font-size: .75rem; color: #555; }
 .tabs { display: flex; gap: 8px; }
 .tab {
-  padding: 8px 22px; border: 2px solid #2a2a50;
+  padding: 8px 22px; border: 2px solid #3a3818;
   border-radius: 8px; cursor: pointer;
   font-size: .88rem; font-family: inherit;
-  background: #13132a; color: #777;
+  background: #201e0a; color: #777;
   transition: all .15s;
 }
 .tab.active { background: #5b52e8; border-color: #5b52e8; color: #fff; }
@@ -32,21 +32,21 @@ h1 { font-size: 1.15rem; color: #9db5f5; }
 .left  { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 300px; }
 .right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 canvas { border-radius: 10px; display: block; }
-#river { border: 2px solid #2a2a50; }
-#tree  { border: 2px solid #2a2a50; background: #080818; }
-.panel { background: #13132a; border: 1px solid #2a2a50; border-radius: 10px; padding: 12px; }
+#river { border: 2px solid #3a3818; }
+#tree  { border: 2px solid #3a3818; background: #0e0d04; }
+.panel { background: #201e0a; border: 1px solid #3a3818; border-radius: 10px; padding: 12px; }
 .speed-row { display:flex; align-items:center; gap:8px; font-size:.8rem; color:#888; margin-bottom:8px; }
 input[type=range] { flex:1; accent-color:#6c63ff; }
 .btns { display:flex; gap:8px; }
 button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; font-size:.85rem; font-family:inherit; transition:background .15s; }
 #startBtn { background:#5b52e8; color:#fff; }
 #startBtn:hover { background:#6c63ff; }
-#startBtn:disabled { background:#2a2a50; color:#555; cursor:default; }
-#resetBtn { background:#1e1e38; color:#aaa; }
-#resetBtn:hover { background:#262645; }
+#startBtn:disabled { background:#3a3818; color:#555; cursor:default; }
+#resetBtn { background:#252308; color:#aaa; }
+#resetBtn:hover { background:#302e12; }
 .sbox {
   text-align:center; font-size:.82rem; padding:9px;
-  border-radius:7px; background:#13132a; border:1px solid #2a2a50;
+  border-radius:7px; background:#201e0a; border:1px solid #3a3818;
   color:#888; min-height:36px; display:flex; align-items:center; justify-content:center;
 }
 .sbox.ok { color:#4ade80; background:#0a2018; border-color:#1a5030; }
@@ -132,7 +132,7 @@ const TW=780, TH=700, NR=22;
 let nodeMap={}, edgeList=[], steps=[];
 
 const COL={
-  pending:  '#3a3a5a',   // 회색 — 미탐색
+  pending:  '#3a3818',   // 회색 — 미탐색
   trying:   '#f5c518',   // 노랑 — 탐색 중
   safe:     '#4ade80',   // 초록 — 유효
   conflict: '#f87171',   // 빨강 — 무효/방문됨
@@ -365,7 +365,7 @@ function drawTree(){
     if(!revealed.has(e.from)||!revealed.has(e.to)) continue;
     const a=nodeMap[e.from], b=nodeMap[e.to];
     const hot=(e.to===activeId);
-    ctx.strokeStyle=hot?'#f5c518':'#252545';
+    ctx.strokeStyle=hot?'#f5c518':'#2e2c10';
     ctx.lineWidth=hot?2.5:1.2;
     ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
   }
