@@ -265,105 +265,89 @@ function assignPositions(){
 }
 
 // ── 강 그리기 ─────────────────────────────────────────────────────
-// 구역: 왼쪽 땅(0~105), 강(105~195), 오른쪽 땅(195~300)
+// 구역: 왼쪽 땅(0~100), 강(100~200), 오른쪽 땅(200~300)
 const rCtx=document.getElementById('river').getContext('2d');
 const RW=300,RH=330;
-const LX=105,RVW=90;  // 강 시작x, 강 너비
-const BOAT_L=LX/2, BOAT_R=LX+RVW+(RW-LX-RVW)/2, BOAT_MID=LX+RVW/2;
+const LBW=100,RIVW=100;                         // 왼쪽 땅 너비, 강 너비
+const BOAT_L=LBW/2;                             // 왼쪽 정박 x=50
+const BOAT_R=LBW+RIVW+(RW-LBW-RIVW)/2;         // 오른쪽 정박 x=250
+const BOAT_Y=240;                               // 배 y 위치
 
-// 뱅크 위 캐릭터 배치 좌표 (최대 3개)
-function bankPos(side, count){
-  const cx = side===0 ? LX/2 : LX+RVW+(RW-LX-RVW)/2;
-  const offsets=[[-28,0],[28,0]];
-  if(count===1) return [[cx,160]];
-  if(count===2) return [[cx-24,160],[cx+24,160]];
-  return [[cx-28,140],[cx+28,140],[cx,185]];
+// 강변 캐릭터 배치 (배 위치와 겹치지 않게 위쪽에)
+function bankPos(side,n){
+  const cx=side===0?BOAT_L:BOAT_R;
+  if(n===1) return [[cx,110]];
+  if(n===2) return [[cx-26,100],[cx+26,100]];
+  return [[cx-26,85],[cx+26,85],[cx,145]];
 }
 
-function drawRiver(prev, cur, moving){
+// bx: 배의 현재 x 위치 (애니메이션에서 보간)
+function drawRiverAt(prev,cur,moving,carriedIdx,bx){
   const ctx=rCtx;
   ctx.clearRect(0,0,RW,RH);
 
   // 배경
-  ctx.fillStyle='#1e4020'; ctx.fillRect(0,0,LX,RH);
-  ctx.fillStyle='#0d4475'; ctx.fillRect(LX,0,RVW,RH);
-  ctx.fillStyle='#1e4520'; ctx.fillRect(LX+RVW,0,RW-LX-RVW,RH);
+  ctx.fillStyle='#1e4020'; ctx.fillRect(0,0,LBW,RH);
+  ctx.fillStyle='#0d4475'; ctx.fillRect(LBW,0,RIVW,RH);
+  ctx.fillStyle='#1e4520'; ctx.fillRect(LBW+RIVW,0,RW-LBW-RIVW,RH);
 
   // 강 물결
   ctx.strokeStyle='#1a5a99'; ctx.lineWidth=1.5;
-  for(let y=35;y<RH-20;y+=22){
+  for(let y=35;y<RH-15;y+=22){
     ctx.beginPath();
-    ctx.moveTo(LX,y);
-    ctx.bezierCurveTo(LX+20,y-5,LX+RVW-20,y+5,LX+RVW,y);
+    ctx.moveTo(LBW,y); ctx.bezierCurveTo(LBW+25,y-5,LBW+75,y+5,LBW+RIVW,y);
     ctx.stroke();
   }
 
   // 레이블
   ctx.font='bold 11px Arial'; ctx.textAlign='center';
-  ctx.fillStyle='#88cc88'; ctx.fillText('왼쪽',LX/2,15);
-  ctx.fillStyle='#88aaee'; ctx.fillText('강',LX+RVW/2,15);
-  ctx.fillStyle='#88cc88'; ctx.fillText('오른쪽',LX+RVW+(RW-LX-RVW)/2,15);
+  ctx.fillStyle='#88cc88'; ctx.fillText('왼쪽',BOAT_L,15);
+  ctx.fillStyle='#88aaee'; ctx.fillText('강',LBW+RIVW/2,15);
+  ctx.fillStyle='#88cc88'; ctx.fillText('오른쪽',BOAT_R,15);
 
-  // 이동 중인지 판단
-  const inTransit = (moving !== null);
-  const carriedIdx = CARRIED_IDX[moving] ?? -1;
-
-  // 배 위치
-  let bx;
-  if(inTransit)                 bx = BOAT_MID;
-  else if(cur[0]===0)           bx = BOAT_L;
-  else                          bx = BOAT_R;
-
-  // 배 그리기
-  ctx.fillStyle='#7a5218';
-  ctx.beginPath(); ctx.ellipse(bx,200,30,13,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#a07030';
-  ctx.beginPath(); ctx.ellipse(bx,198,27,10,0,0,Math.PI*2); ctx.fill();
-
-  // 배에 탄 캐릭터 (농부 + 동반자)
-  ctx.font='20px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  if(inTransit && carriedIdx>=0){
-    // 농부와 동반자 나란히
-    ctx.fillText(EMOJI[0], bx-14, 192);  // 농부
-    ctx.fillText(EMOJI[carriedIdx], bx+14, 192);  // 동반자
-  } else {
-    // 농부 혼자 (혼자 이동 or 정착 상태)
-    ctx.fillText(EMOJI[0], bx, 192);
-  }
-
-  // 이동 중 화살표
-  if(inTransit){
-    const dir = cur[0]===1 ? '→' : '←';
-    ctx.font='bold 16px Arial'; ctx.fillStyle='#f5c518';
-    ctx.fillText(dir, bx, 220);
-  }
-
-  // 강변 캐릭터 (늑대·양·양배추)
-  // inTransit=true 이면 동반자는 배 위에, 나머지는 prev 위치
-  const dispState = inTransit ? prev : cur;
-  const leftChars=[], rightChars=[];
+  // 강변 캐릭터 (이동 중엔 prev 위치 유지, 동반자는 배에)
+  const inTransit=(moving!==null);
+  const dispState=inTransit?prev:cur;
+  const leftC=[],rightC=[];
   for(let i=1;i<=3;i++){
-    if(inTransit && i===carriedIdx) continue; // 배 위에 있음
-    if(dispState[i]===0) leftChars.push(i);
-    else rightChars.push(i);
+    if(inTransit&&i===carriedIdx) continue;
+    if(dispState[i]===0) leftC.push(i); else rightC.push(i);
+  }
+  ctx.font='26px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  bankPos(0,leftC.length).forEach(([x,y],i)=>ctx.fillText(EMOJI[leftC[i]],x,y));
+  bankPos(1,rightC.length).forEach(([x,y],i)=>ctx.fillText(EMOJI[rightC[i]],x,y));
+
+  // 배 몸체
+  ctx.fillStyle='#7a5218';
+  ctx.beginPath(); ctx.ellipse(bx,BOAT_Y,40,15,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#a07030';
+  ctx.beginPath(); ctx.ellipse(bx,BOAT_Y-2,37,12,0,0,Math.PI*2); ctx.fill();
+
+  // 탑승자: 농부는 배 왼쪽, 동반자는 배 오른쪽
+  ctx.font='20px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(inTransit&&carriedIdx>=0){
+    ctx.fillText(EMOJI[0],  bx-16, BOAT_Y-8);   // 농부 (왼쪽)
+    ctx.fillText(EMOJI[carriedIdx], bx+16, BOAT_Y-8);  // 동반자 (오른쪽)
+  } else {
+    ctx.fillText(EMOJI[0], bx, BOAT_Y-8);        // 농부만
   }
 
-  ctx.font='24px serif'; ctx.textBaseline='middle';
-  const lpos=bankPos(0,leftChars.length);
-  leftChars.forEach((ci,idx)=>{ ctx.fillText(EMOJI[ci],lpos[idx][0],lpos[idx][1]); });
-  const rpos=bankPos(1,rightChars.length);
-  rightChars.forEach((ci,idx)=>{ ctx.fillText(EMOJI[ci],rpos[idx][0],rpos[idx][1]); });
+  // 이동 방향 화살표
+  if(inTransit){
+    const dir=cur[0]===1?'→':'←';
+    ctx.font='bold 15px Arial'; ctx.fillStyle='#f5c518';
+    ctx.fillText(dir, bx, BOAT_Y+18);
+  }
 
-  // 이동 설명 텍스트
+  // 하단 안내
   ctx.font='11px Arial'; ctx.textAlign='center'; ctx.textBaseline='bottom';
   if(inTransit){
     ctx.fillStyle='#f5c518';
-    const label = moving==='혼자' ? '농부 혼자 이동' : `농부 + ${moving} 이동`;
-    ctx.fillText(label, RW/2, RH-10);
+    ctx.fillText(moving==='혼자'?'농부 혼자 이동':`농부 + ${moving} 이동`, RW/2, RH-8);
   } else {
-    const isGoal=cur.every(x=>x===1);
-    ctx.fillStyle = isGoal ? '#4ade80' : '#555';
-    ctx.fillText(isGoal ? '🎉 목표 달성! 모두 오른쪽 도착' : '초기: 모두 왼쪽 → 목표: 모두 오른쪽', RW/2, RH-10);
+    const ok=cur.every(x=>x===1);
+    ctx.fillStyle=ok?'#4ade80':'#555';
+    ctx.fillText(ok?'🎉 목표 달성!':'초기: 모두 왼쪽 → 목표: 모두 오른쪽', RW/2, RH-8);
   }
 }
 
@@ -469,9 +453,26 @@ async function runAnim(){
           setStatus(`↩ 「${n.label}」 — 백트래킹`);
         break;
       }
-      case 'river':
-        drawRiver(step.prev, step.cur, step.moving);
+      case 'river':{
+        const ci=CARRIED_IDX[step.moving]??-1;
+        const fromX=step.prev[0]===0?BOAT_L:BOAT_R;
+        const toX  =step.cur[0] ===0?BOAT_L:BOAT_R;
+        if(step.moving!==null){
+          // 배가 강을 건너는 애니메이션
+          const spd=parseInt(document.getElementById('speed').value);
+          const frames=Math.max(6,22-spd*2);
+          const fd=Math.max(15,40-spd*3);
+          for(let f=0;f<=frames;f++){
+            if(runId!==myId) return;
+            const bx=fromX+(toX-fromX)*(f/frames);
+            drawRiverAt(step.prev,step.cur,step.moving,ci,bx);
+            await sleep(fd);
+          }
+        } else {
+          drawRiverAt(step.prev,step.cur,null,-1,toX);
+        }
         break;
+      }
       case 'solved':
         step.pathIds.forEach(id=>{nodeState[id]='solution';});
         setStatus('🎉 탐색 성공! 모두 강을 건넜습니다.',true);
@@ -503,7 +504,7 @@ function reset(){
   setStatus('탐색 준비 중...');
   if(currentMode==='dfs') buildDFS(); else buildBFS();
   assignPositions();
-  drawRiver([0,0,0,0],[0,0,0,0],null);
+  drawRiverAt([0,0,0,0],[0,0,0,0],null,-1,BOAT_L);
   drawTree();
 }
 
