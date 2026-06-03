@@ -87,7 +87,7 @@ button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; fo
       <span id="modeLabel">🌳 상태 공간 트리 — DFS (깊이 우선)</span>
       <span id="vcnt">방문: 0</span>
     </div>
-    <canvas id="tree" width="780" height="550"></canvas>
+    <canvas id="tree" width="780" height="700"></canvas>
     <div class="legend">
       <span class="litem"><span class="ldot" style="background:#4a4a6a"></span>미탐색(대기)</span>
       <span class="litem"><span class="ldot" style="background:#f5c518"></span>탐색 중</span>
@@ -128,7 +128,7 @@ function getMoves(s){
 }
 
 // ── 트리 공통 ─────────────────────────────────────────────────────
-const TW=780, TH=550, NR=22;
+const TW=780, TH=700, NR=22;
 let nodeMap={}, edgeList=[], steps=[];
 
 const COL={
@@ -276,6 +276,7 @@ const BOAT_Y=240;                               // 배 y 위치
 // 강변 캐릭터 배치 (배 위치와 겹치지 않게 위쪽에)
 function bankPos(side,n){
   const cx=side===0?BOAT_L:BOAT_R;
+  if(n===0) return [];
   if(n===1) return [[cx,110]];
   if(n===2) return [[cx-26,100],[cx+26,100]];
   return [[cx-26,85],[cx+26,85],[cx,145]];
