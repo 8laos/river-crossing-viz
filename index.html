@@ -28,8 +28,8 @@ h1 { font-size: 1.15rem; color: #9db5f5; }
   transition: all .15s;
 }
 .tab.active { background: #5b52e8; border-color: #5b52e8; color: #fff; }
-.main { display: flex; gap: 18px; align-items: flex-start; width: 100%; max-width: 1100px; }
-.left  { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 290px; }
+.main { display: flex; gap: 18px; align-items: flex-start; width: 100%; max-width: 1120px; }
+.left  { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 300px; }
 .right { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 canvas { border-radius: 10px; display: block; }
 #river { border: 2px solid #2a2a50; }
@@ -68,7 +68,7 @@ button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; fo
 
 <div class="main">
   <div class="left">
-    <canvas id="river" width="290" height="310"></canvas>
+    <canvas id="river" width="300" height="330"></canvas>
     <div class="panel">
       <div class="speed-row">
         <span>⚡ 속도</span>
@@ -87,12 +87,13 @@ button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; fo
       <span id="modeLabel">🌳 상태 공간 트리 — DFS (깊이 우선)</span>
       <span id="vcnt">방문: 0</span>
     </div>
-    <canvas id="tree" width="770" height="540"></canvas>
+    <canvas id="tree" width="780" height="550"></canvas>
     <div class="legend">
-      <span class="litem"><span class="ldot" style="background:#f5c518"></span>탐색 시도</span>
+      <span class="litem"><span class="ldot" style="background:#4a4a6a"></span>미탐색(대기)</span>
+      <span class="litem"><span class="ldot" style="background:#f5c518"></span>탐색 중</span>
       <span class="litem"><span class="ldot" style="background:#4ade80"></span>유효(안전)</span>
       <span class="litem"><span class="ldot" style="background:#f87171"></span>무효/이미방문</span>
-      <span class="litem"><span class="ldot" style="background:#777"></span>백트래킹(DFS)</span>
+      <span class="litem"><span class="ldot" style="background:#666"></span>백트래킹</span>
       <span class="litem"><span class="ldot" style="background:#60a5fa"></span>해 경로</span>
     </div>
   </div>
@@ -103,106 +104,120 @@ button { flex:1; padding:8px; border:none; border-radius:7px; cursor:pointer; fo
 
 // ── 문제 정의 ─────────────────────────────────────────────────────
 // State: [farmer, wolf, sheep, cabbage]  0=왼쪽  1=오른쪽
+// 캐릭터 인덱스: 0=농부, 1=늑대, 2=양, 3=양배추
 const GOAL = '1111';
+const EMOJI = ['🧑‍🌾','🐺','🐑','🥬'];
+const CARRIED_IDX = {'혼자':-1,'늑대':1,'양':2,'양배추':3};
 
-function key(s) { return s.join(''); }
+function key(s){ return s.join(''); }
 
-function isValid(s) {
-  const [f,w,sh,c] = s;
-  if (w===sh && f!==w)  return false; // 늑대+양 단둘
-  if (sh===c && f!==sh) return false; // 양+양배추 단둘
+function isValid(s){
+  const [f,w,sh,c]=s;
+  if(w===sh && f!==w) return false;
+  if(sh===c && f!==sh) return false;
   return true;
 }
 
-function getMoves(s) {
-  const [f,w,sh,c] = s;
-  const nf = 1-f;
-  const m = [];
+function getMoves(s){
+  const [f,w,sh,c]=s, nf=1-f, m=[];
   m.push({label:'혼자',   emoji:'🚣',  next:[nf,w,sh,c]});
-  if (w===f)  m.push({label:'늑대',   emoji:'🐺', next:[nf,nf,sh,c]});
-  if (sh===f) m.push({label:'양',     emoji:'🐑', next:[nf,w,nf,c]});
-  if (c===f)  m.push({label:'양배추', emoji:'🥬', next:[nf,w,sh,nf]});
+  if(w===f)  m.push({label:'늑대',   emoji:'🐺', next:[nf,nf,sh,c]});
+  if(sh===f) m.push({label:'양',     emoji:'🐑', next:[nf,w,nf,c]});
+  if(c===f)  m.push({label:'양배추', emoji:'🥬', next:[nf,w,sh,nf]});
   return m;
 }
 
-// ── 트리 공통 데이터 ──────────────────────────────────────────────
-const TW=770, TH=540, NR=22;
-
+// ── 트리 공통 ─────────────────────────────────────────────────────
+const TW=780, TH=550, NR=22;
 let nodeMap={}, edgeList=[], steps=[];
 
-const COL = {
-  trying:   '#f5c518',
-  safe:     '#4ade80',
-  conflict: '#f87171',
-  backtrack:'#777',
-  solution: '#60a5fa',
+const COL={
+  pending:  '#3a3a5a',   // 회색 — 미탐색
+  trying:   '#f5c518',   // 노랑 — 탐색 중
+  safe:     '#4ade80',   // 초록 — 유효
+  conflict: '#f87171',   // 빨강 — 무효/방문됨
+  backtrack:'#555566',   // 어두운 회색 — 백트래킹
+  solution: '#60a5fa',   // 파랑 — 해 경로
 };
 
-// ── DFS 단계 생성 ─────────────────────────────────────────────────
-function buildDFS() {
+// ── DFS 단계 생성 (자식 먼저 회색으로 펼친 뒤 평가) ───────────────
+function buildDFS(){
   nodeMap={}; edgeList=[]; steps=[];
   let uid=0;
-  const visited = new Set(['0000']);
+  const visited=new Set(['0000']);
 
   const root={id:uid++,parentId:null,label:'시작',emoji:'',state:[0,0,0,0],level:0,children:[]};
   nodeMap[root.id]=root;
   steps.push({t:'node',id:root.id,status:'safe'});
-  steps.push({t:'river',state:[0,0,0,0],moving:null});
+  steps.push({t:'river',prev:[0,0,0,0],cur:[0,0,0,0],moving:null});
 
-  function dfs(state,parentId,depth,path) {
-    if (key(state)===GOAL) {
+  function dfs(state,parentId,depth,path){
+    if(key(state)===GOAL){
       steps.push({t:'solved',pathIds:[...path]});
       return true;
     }
-    if (depth>14) return false;
+    if(depth>14) return false;
 
-    for (const mv of getMoves(state)) {
+    const moves=getMoves(state);
+    const childIds=[];
+
+    // 1단계: 가능한 이동 모두 회색 노드로 먼저 표시
+    for(const mv of moves){
       const id=uid++;
-      const nk=key(mv.next);
       const node={id,parentId,label:mv.label,emoji:mv.emoji,state:mv.next,level:depth+1,children:[]};
       nodeMap[id]=node;
       nodeMap[parentId].children.push(id);
       edgeList.push({from:parentId,to:id});
+      childIds.push({id,mv});
+      steps.push({t:'node',id,status:'pending'}); // 회색
+    }
 
-      steps.push({t:'node',id,status:'trying'});
-      steps.push({t:'river',state:mv.next,moving:mv.label});
+    // 2단계: 하나씩 평가
+    for(const {id,mv} of childIds){
+      const nk=key(mv.next);
 
-      if (!isValid(mv.next)||visited.has(nk)) {
+      steps.push({t:'upd',id,status:'trying'});  // 노랑
+      steps.push({t:'river',prev:state,cur:mv.next,moving:mv.label});
+
+      if(!isValid(mv.next)||visited.has(nk)){
         steps.push({t:'upd',id,status:'conflict'});
         continue;
       }
+
       steps.push({t:'upd',id,status:'safe'});
       visited.add(nk);
       path.push(id);
-      if (dfs(mv.next,id,depth+1,path)) return true;
+
+      if(dfs(mv.next,id,depth+1,path)) return true;
+
       path.pop();
       steps.push({t:'upd',id,status:'backtrack'});
-      steps.push({t:'river',state,moving:null});
+      steps.push({t:'river',prev:mv.next,cur:state,moving:null});
     }
     return false;
   }
+
   dfs([0,0,0,0],root.id,0,[root.id]);
 }
 
 // ── BFS 단계 생성 ─────────────────────────────────────────────────
-function buildBFS() {
+function buildBFS(){
   nodeMap={}; edgeList=[]; steps=[];
   let uid=0;
   const visited=new Set(['0000']);
-  const pathOf={}; // nodeId → 루트부터 해당 노드까지의 id 배열
+  const pathOf={};
 
   const root={id:uid++,parentId:null,label:'시작',emoji:'',state:[0,0,0,0],level:0,children:[]};
   nodeMap[root.id]=root;
   pathOf[root.id]=[root.id];
   steps.push({t:'node',id:root.id,status:'safe'});
-  steps.push({t:'river',state:[0,0,0,0],moving:null});
+  steps.push({t:'river',prev:[0,0,0,0],cur:[0,0,0,0],moving:null});
 
   const queue=[{state:[0,0,0,0],nid:root.id,depth:0}];
 
-  outer: while (queue.length>0) {
+  outer: while(queue.length>0){
     const {state,nid,depth}=queue.shift();
-
-    for (const mv of getMoves(state)) {
+    for(const mv of getMoves(state)){
       const id=uid++;
       const nk=key(mv.next);
       const node={id,parentId:nid,label:mv.label,emoji:mv.emoji,state:mv.next,level:depth+1,children:[]};
@@ -211,17 +226,16 @@ function buildBFS() {
       edgeList.push({from:nid,to:id});
 
       steps.push({t:'node',id,status:'trying'});
-      steps.push({t:'river',state:mv.next,moving:mv.label});
+      steps.push({t:'river',prev:state,cur:mv.next,moving:mv.label});
 
-      if (!isValid(mv.next)||visited.has(nk)) {
+      if(!isValid(mv.next)||visited.has(nk)){
         steps.push({t:'upd',id,status:'conflict'});
         continue;
       }
       steps.push({t:'upd',id,status:'safe'});
       visited.add(nk);
       pathOf[id]=[...pathOf[nid],id];
-
-      if (nk===GOAL) {
+      if(nk===GOAL){
         steps.push({t:'solved',pathIds:pathOf[id]});
         break outer;
       }
@@ -230,17 +244,17 @@ function buildBFS() {
   }
 }
 
-// ── 레이아웃 계산 ─────────────────────────────────────────────────
-function assignPositions() {
+// ── 레이아웃 ─────────────────────────────────────────────────────
+function assignPositions(){
   const levels={};
-  for (const s of steps) {
-    if (s.t!=='node') continue;
+  for(const s of steps){
+    if(s.t!=='node') continue;
     const n=nodeMap[s.id];
     (levels[n.level]=levels[n.level]||[]).push(s.id);
   }
   const maxLv=Math.max(...Object.keys(levels).map(Number));
-  const PX=30,PY=38;
-  for (let lv=0;lv<=maxLv;lv++) {
+  const PX=28, PY=38;
+  for(let lv=0;lv<=maxLv;lv++){
     const ids=levels[lv]||[];
     const y=PY+lv*(TH-PY*2)/maxLv;
     ids.forEach((id,i)=>{
@@ -251,103 +265,120 @@ function assignPositions() {
 }
 
 // ── 강 그리기 ─────────────────────────────────────────────────────
+// 구역: 왼쪽 땅(0~105), 강(105~195), 오른쪽 땅(195~300)
 const rCtx=document.getElementById('river').getContext('2d');
-const RW=290,RH=310;
-const RX=105,RIV=80; // 강 시작x, 너비
+const RW=300,RH=330;
+const LX=105,RVW=90;  // 강 시작x, 강 너비
+const BOAT_L=LX/2, BOAT_R=LX+RVW+(RW-LX-RVW)/2, BOAT_MID=LX+RVW/2;
 
-function drawRiver(state,moving) {
+// 뱅크 위 캐릭터 배치 좌표 (최대 3개)
+function bankPos(side, count){
+  const cx = side===0 ? LX/2 : LX+RVW+(RW-LX-RVW)/2;
+  const offsets=[[-28,0],[28,0]];
+  if(count===1) return [[cx,160]];
+  if(count===2) return [[cx-24,160],[cx+24,160]];
+  return [[cx-28,140],[cx+28,140],[cx,185]];
+}
+
+function drawRiver(prev, cur, moving){
   const ctx=rCtx;
   ctx.clearRect(0,0,RW,RH);
 
   // 배경
-  ctx.fillStyle='#1e4020'; ctx.fillRect(0,0,RX,RH);          // 왼쪽 땅
-  ctx.fillStyle='#0d4475'; ctx.fillRect(RX,0,RIV,RH);        // 강
-  ctx.fillStyle='#1e4520'; ctx.fillRect(RX+RIV,0,RW-RX-RIV,RH); // 오른쪽 땅
+  ctx.fillStyle='#1e4020'; ctx.fillRect(0,0,LX,RH);
+  ctx.fillStyle='#0d4475'; ctx.fillRect(LX,0,RVW,RH);
+  ctx.fillStyle='#1e4520'; ctx.fillRect(LX+RVW,0,RW-LX-RVW,RH);
 
-  // 강 물결 효과
-  ctx.strokeStyle='#1a6699'; ctx.lineWidth=2;
-  for (let y=30;y<RH;y+=20) {
+  // 강 물결
+  ctx.strokeStyle='#1a5a99'; ctx.lineWidth=1.5;
+  for(let y=35;y<RH-20;y+=22){
     ctx.beginPath();
-    ctx.moveTo(RX,y);
-    ctx.bezierCurveTo(RX+20,y-5,RX+60,y+5,RX+RIV,y);
+    ctx.moveTo(LX,y);
+    ctx.bezierCurveTo(LX+20,y-5,LX+RVW-20,y+5,LX+RVW,y);
     ctx.stroke();
   }
 
   // 레이블
-  ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.fillStyle='#aaddaa';
-  ctx.fillText('왼쪽',RX/2,16);
-  ctx.fillStyle='#88bbff';
-  ctx.fillText('강',RX+RIV/2,16);
-  ctx.fillStyle='#aaddaa';
-  ctx.fillText('오른쪽',(RX+RIV+RW)/2,16);
+  ctx.font='bold 11px Arial'; ctx.textAlign='center';
+  ctx.fillStyle='#88cc88'; ctx.fillText('왼쪽',LX/2,15);
+  ctx.fillStyle='#88aaee'; ctx.fillText('강',LX+RVW/2,15);
+  ctx.fillStyle='#88cc88'; ctx.fillText('오른쪽',LX+RVW+(RW-LX-RVW)/2,15);
 
-  // 배 (농부의 현재 위치 쪽)
-  const farmerSide=state[0];
-  const bx=farmerSide===0 ? RX/2 : RX+RIV+(RW-RX-RIV)/2;
-  ctx.fillStyle='#a0722a';
-  ctx.beginPath();
-  ctx.ellipse(bx,160,28,12,0,0,Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle='#c8922a';
-  ctx.beginPath();
-  ctx.ellipse(bx,158,26,10,0,0,Math.PI*2);
-  ctx.fill();
+  // 이동 중인지 판단
+  const inTransit = (moving !== null);
+  const carriedIdx = CARRIED_IDX[moving] ?? -1;
 
-  // 캐릭터 배치
-  const chars=['🐺','🐑','🥬'];
-  const leftC=[],rightC=[];
-  // 농부는 배 위에
-  ctx.font='22px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🧑‍🌾',bx,152);
+  // 배 위치
+  let bx;
+  if(inTransit)                 bx = BOAT_MID;
+  else if(cur[0]===0)           bx = BOAT_L;
+  else                          bx = BOAT_R;
 
-  // 나머지 캐릭터 (늑대/양/양배추)
-  [state[1],state[2],state[3]].forEach((side,i)=>{
-    if (side===0) leftC.push(chars[i]);
-    else rightC.push(chars[i]);
-  });
+  // 배 그리기
+  ctx.fillStyle='#7a5218';
+  ctx.beginPath(); ctx.ellipse(bx,200,30,13,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#a07030';
+  ctx.beginPath(); ctx.ellipse(bx,198,27,10,0,0,Math.PI*2); ctx.fill();
 
-  ctx.font='24px serif';
-  const lx=[30,65,30], rx=[RX+RIV+18,RX+RIV+53,RX+RIV+18];
-  const ly=[80,80,125], ry=[80,80,125];
-  leftC.forEach((em,i)=>{ctx.fillText(em,lx[i],ly[i]+20);});
-  rightC.forEach((em,i)=>{ctx.fillText(em,rx[i],ry[i]+20);});
-
-  // 화살표 (이동 방향)
-  if (moving) {
-    const dir=farmerSide===1?'→':'←';
-    const ax=RX+RIV/2, ay=210;
-    ctx.font='bold 18px Arial'; ctx.textAlign='center'; ctx.fillStyle='#f5c518';
-    ctx.fillText(dir,ax,ay);
-    ctx.font='11px Arial';
-    ctx.fillText(`「${moving}」 이동 중`,ax,ay+20);
+  // 배에 탄 캐릭터 (농부 + 동반자)
+  ctx.font='20px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(inTransit && carriedIdx>=0){
+    // 농부와 동반자 나란히
+    ctx.fillText(EMOJI[0], bx-14, 192);  // 농부
+    ctx.fillText(EMOJI[carriedIdx], bx+14, 192);  // 동반자
+  } else {
+    // 농부 혼자 (혼자 이동 or 정착 상태)
+    ctx.fillText(EMOJI[0], bx, 192);
   }
 
-  // 하단 상태
-  const isGoal=state.every(x=>x===1);
-  ctx.font='11px Arial'; ctx.textAlign='center'; ctx.fillStyle='#555';
-  ctx.fillText(`초기: 모두 왼쪽 → 목표: 모두 오른쪽`,RW/2,RH-22);
-  if (isGoal) {
-    ctx.fillStyle='#4ade80'; ctx.font='bold 12px Arial';
-    ctx.fillText('🎉 목표 달성!',RW/2,RH-6);
+  // 이동 중 화살표
+  if(inTransit){
+    const dir = cur[0]===1 ? '→' : '←';
+    ctx.font='bold 16px Arial'; ctx.fillStyle='#f5c518';
+    ctx.fillText(dir, bx, 220);
+  }
+
+  // 강변 캐릭터 (늑대·양·양배추)
+  // inTransit=true 이면 동반자는 배 위에, 나머지는 prev 위치
+  const dispState = inTransit ? prev : cur;
+  const leftChars=[], rightChars=[];
+  for(let i=1;i<=3;i++){
+    if(inTransit && i===carriedIdx) continue; // 배 위에 있음
+    if(dispState[i]===0) leftChars.push(i);
+    else rightChars.push(i);
+  }
+
+  ctx.font='24px serif'; ctx.textBaseline='middle';
+  const lpos=bankPos(0,leftChars.length);
+  leftChars.forEach((ci,idx)=>{ ctx.fillText(EMOJI[ci],lpos[idx][0],lpos[idx][1]); });
+  const rpos=bankPos(1,rightChars.length);
+  rightChars.forEach((ci,idx)=>{ ctx.fillText(EMOJI[ci],rpos[idx][0],rpos[idx][1]); });
+
+  // 이동 설명 텍스트
+  ctx.font='11px Arial'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  if(inTransit){
+    ctx.fillStyle='#f5c518';
+    const label = moving==='혼자' ? '농부 혼자 이동' : `농부 + ${moving} 이동`;
+    ctx.fillText(label, RW/2, RH-10);
   } else {
-    const s=state.map((v,i)=>['농','늑','양','배'][i]+(v?'→':'←')).join(' ');
-    ctx.fillStyle='#555'; ctx.font='9px Arial';
-    ctx.fillText(s,RW/2,RH-6);
+    const isGoal=cur.every(x=>x===1);
+    ctx.fillStyle = isGoal ? '#4ade80' : '#555';
+    ctx.fillText(isGoal ? '🎉 목표 달성! 모두 오른쪽 도착' : '초기: 모두 왼쪽 → 목표: 모두 오른쪽', RW/2, RH-10);
   }
 }
 
-// ── 트리 그리기 ───────────────────────────────────────────────────
+// ── 트리 그리기 ──────────────────────────────────────────────────
 const tCtx=document.getElementById('tree').getContext('2d');
 let revealed=new Set(), nodeState={}, activeId=null;
 
-function drawTree() {
+function drawTree(){
   const ctx=tCtx;
   ctx.clearRect(0,0,TW,TH);
 
   // 엣지
-  for (const e of edgeList) {
-    if (!revealed.has(e.from)||!revealed.has(e.to)) continue;
-    const a=nodeMap[e.from],b=nodeMap[e.to];
+  for(const e of edgeList){
+    if(!revealed.has(e.from)||!revealed.has(e.to)) continue;
+    const a=nodeMap[e.from], b=nodeMap[e.to];
     const hot=(e.to===activeId);
     ctx.strokeStyle=hot?'#f5c518':'#252545';
     ctx.lineWidth=hot?2.5:1.2;
@@ -355,40 +386,41 @@ function drawTree() {
   }
 
   // 노드
-  for (const id of revealed) {
+  for(const id of revealed){
     const n=nodeMap[id];
-    const st=nodeState[id]||'trying';
+    const st=nodeState[id]||'pending';
     const cl=COL[st]||'#888';
     const hot=(id==activeId);
 
-    if (hot) {
+    if(hot){
       ctx.beginPath(); ctx.arc(n.x,n.y,NR+6,0,Math.PI*2);
       ctx.fillStyle=cl+'33'; ctx.fill();
     }
     ctx.beginPath(); ctx.arc(n.x,n.y,NR,0,Math.PI*2);
     ctx.fillStyle=cl; ctx.fill();
-    ctx.strokeStyle=hot?'#fff':'#00000030';
+    ctx.strokeStyle=hot?'#fff':(st==='pending'?'#5a5a8a':'#00000030');
     ctx.lineWidth=hot?2:1; ctx.stroke();
 
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    if (n.label==='시작') {
+    if(n.label==='시작'){
       ctx.fillStyle='#ffffffee'; ctx.font='bold 10px Arial';
       ctx.fillText('시작',n.x,n.y);
     } else {
-      ctx.font='13px serif';
-      ctx.fillStyle='#ffffffee';
+      ctx.font='14px serif';
+      const textColor = (st==='pending'||st==='backtrack') ? '#aaaacc' : '#ffffffee';
+      ctx.fillStyle=textColor;
       ctx.fillText(n.emoji,n.x,n.y-6);
-      ctx.font='bold 8px Arial';
-      ctx.fillStyle='#ffffffcc';
+      ctx.font='bold 7.5px Arial';
+      ctx.fillStyle=textColor;
       ctx.fillText(n.label,n.x,n.y+8);
     }
   }
 }
 
-// ── 애니메이션 ────────────────────────────────────────────────────
-let runId=0,visitCnt=0;
+// ── 애니메이션 ───────────────────────────────────────────────────
+let runId=0, visitCnt=0;
 
-function getDelay() {
+function getDelay(){
   const s=parseInt(document.getElementById('speed').value);
   return Math.max(60,1250-s*115);
 }
@@ -398,36 +430,47 @@ function setStatus(msg,ok=false){
   el.textContent=msg; el.className='sbox'+(ok?' ok':'');
 }
 
-async function runAnim() {
+async function runAnim(){
   const myId=++runId;
   document.getElementById('startBtn').disabled=true;
 
-  for (const step of steps) {
-    if (runId!==myId) return;
-    switch(step.t) {
-      case 'node': {
+  for(const step of steps){
+    if(runId!==myId) return;
+    switch(step.t){
+      case 'node':{
         revealed.add(step.id);
         nodeState[step.id]=step.status;
-        activeId=step.id;
+        if(step.status!=='pending') activeId=step.id;
         const n=nodeMap[step.id];
-        if (step.status==='trying'&&n.label!=='시작') {
-          visitCnt++;
-          document.getElementById('vcnt').textContent=`방문: ${visitCnt}`;
-          setStatus(`「${n.label}」 이동 시도 중...`);
+        if(step.status==='trying'||step.status==='pending'){
+          if(step.status==='trying'){
+            visitCnt++;
+            document.getElementById('vcnt').textContent=`방문: ${visitCnt}`;
+            setStatus(`「${n.label}」 이동 시도 중...`);
+          } else {
+            setStatus(`가능한 이동 펼치는 중... (${n.label})`);
+          }
         }
         break;
       }
-      case 'upd': {
+      case 'upd':{
         nodeState[step.id]=step.status;
         activeId=step.id;
         const n=nodeMap[step.id];
-        if (step.status==='safe')      setStatus(`✅ 「${n.label}」 — 유효한 상태`);
-        else if (step.status==='conflict')  setStatus(`❌ 「${n.label}」 — 무효 또는 이미 방문`);
-        else if (step.status==='backtrack') setStatus(`↩ 「${n.label}」 — 백트래킹`);
+        if(step.status==='trying'){
+          visitCnt++;
+          document.getElementById('vcnt').textContent=`방문: ${visitCnt}`;
+          setStatus(`「${n.label}」 이동 시도 중...`);
+        } else if(step.status==='safe')
+          setStatus(`✅ 「${n.label}」 — 유효한 상태`);
+        else if(step.status==='conflict')
+          setStatus(`❌ 「${n.label}」 — 무효 또는 이미 방문`);
+        else if(step.status==='backtrack')
+          setStatus(`↩ 「${n.label}」 — 백트래킹`);
         break;
       }
       case 'river':
-        drawRiver(step.state,step.moving);
+        drawRiver(step.prev, step.cur, step.moving);
         break;
       case 'solved':
         step.pathIds.forEach(id=>{nodeState[id]='solution';});
@@ -437,13 +480,13 @@ async function runAnim() {
     drawTree();
     await sleep(getDelay());
   }
-  if (runId===myId) document.getElementById('startBtn').disabled=false;
+  if(runId===myId) document.getElementById('startBtn').disabled=false;
 }
 
-// ── 탭 전환 ──────────────────────────────────────────────────────
+// ── 탭 전환 & 리셋 ──────────────────────────────────────────────
 let currentMode='dfs';
 
-function switchTab(mode) {
+function switchTab(mode){
   currentMode=mode;
   document.getElementById('tabDFS').className='tab'+(mode==='dfs'?' active':'');
   document.getElementById('tabBFS').className='tab'+(mode==='bfs'?' active':'');
@@ -452,15 +495,15 @@ function switchTab(mode) {
   reset();
 }
 
-function reset() {
+function reset(){
   runId++;
   visitCnt=0; revealed=new Set(); nodeState={}; activeId=null;
   document.getElementById('vcnt').textContent='방문: 0';
   document.getElementById('startBtn').disabled=false;
   setStatus('탐색 준비 중...');
-  if (currentMode==='dfs') buildDFS(); else buildBFS();
+  if(currentMode==='dfs') buildDFS(); else buildBFS();
   assignPositions();
-  drawRiver([0,0,0,0],null);
+  drawRiver([0,0,0,0],[0,0,0,0],null);
   drawTree();
 }
 
